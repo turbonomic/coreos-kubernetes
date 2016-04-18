@@ -30,7 +30,7 @@ coreos:
           content: |
             [Service]
             ExecStartPre=/usr/bin/curl --silent -X PUT -d \
-            "value={\"Network\" : \"{{.PodCIDR}}\", \"Backend\" : {\"Type\" : \"vxlan\"}}" \
+            "value={\"Network\" : \"{{.PodCIDR}}\"}" \
             http://localhost:2379/v2/keys/coreos.com/network/config?prevExist=false
     - name: kubelet.service
       command: start
@@ -39,10 +39,9 @@ coreos:
         [Service]
         Environment=KUBELET_VERSION={{.K8sVer}}
         Environment=KUBELET_ACI={{.HyperkubeImageRepo}}
-        Environment="RKT_OPTS=--volume dns,kind=host,source=/etc/resolv.conf --mount volume=dns,target=/etc/resolv.conf"
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
         --api-servers=http://localhost:8080 \
-        --register-schedulable=false \
+        --register-node=false \
         --allow-privileged=true \
         --config=/etc/kubernetes/manifests \
         --cluster_dns={{.DNSServiceIP}} \
@@ -92,15 +91,12 @@ write_files:
       #!/bin/bash -e
       /usr/bin/curl -H "Content-Type: application/json" -XPOST -d @"/srv/kubernetes/manifests/kube-system.json" "http://127.0.0.1:8080/api/v1/namespaces"
 
-      /usr/bin/curl  -H "Content-Type: application/json" -XPOST \
-      -d @"/srv/kubernetes/manifests/kube-dns-rc.json" \
-      "http://127.0.0.1:8080/api/v1/namespaces/kube-system/replicationcontrollers"
-
-      /usr/bin/curl  -H "Content-Type: application/json" -XPOST \
-      -d @"/srv/kubernetes/manifests/heapster-dc.json" \
-      "http://127.0.0.1:8080/apis/extensions/v1beta1/namespaces/kube-system/deployments"
-
-      for manifest in {kube-dns,heapster}-svc.json;do
+      for manifest in {kube-dns,heapster,influxdb}-rc.json;do
+          /usr/bin/curl  -H "Content-Type: application/json" -XPOST \
+          -d @"/srv/kubernetes/manifests/$manifest" \
+          "http://127.0.0.1:8080/api/v1/namespaces/kube-system/replicationcontrollers"
+      done
+      for manifest in {kube-dns,heapster,influxdb}-svc.json;do
           /usr/bin/curl  -H "Content-Type: application/json" -XPOST \
           -d @"/srv/kubernetes/manifests/$manifest" \
           "http://127.0.0.1:8080/api/v1/namespaces/kube-system/services"
@@ -197,6 +193,55 @@ write_files:
             path: /usr/share/ca-certificates
           name: ssl-certs-host
 
+  - path: /etc/kubernetes/manifests/kube-podmaster.yaml
+    content: |
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: kube-podmaster
+        namespace: kube-system
+      spec:
+        hostNetwork: true
+        containers:
+        - name: scheduler-elector
+          image: gcr.io/google_containers/podmaster:1.1
+          command:
+          - /podmaster
+          - --etcd-servers=http://localhost:2379
+          - --key=scheduler
+          - --whoami=$private_ipv4
+          - --source-file=/src/manifests/kube-scheduler.yaml
+          - --dest-file=/dst/manifests/kube-scheduler.yaml
+          volumeMounts:
+          - mountPath: /src/manifests
+            name: manifest-src
+            readOnly: true
+          - mountPath: /dst/manifests
+            name: manifest-dst
+        - name: controller-manager-elector
+          image: gcr.io/google_containers/podmaster:1.1
+          command:
+          - /podmaster
+          - --etcd-servers=http://localhost:2379
+          - --key=controller
+          - --whoami=$private_ipv4
+          - --source-file=/src/manifests/kube-controller-manager.yaml
+          - --dest-file=/dst/manifests/kube-controller-manager.yaml
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /src/manifests
+            name: manifest-src
+            readOnly: true
+          - mountPath: /dst/manifests
+            name: manifest-dst
+        volumes:
+        - hostPath:
+            path: /srv/kubernetes/manifests
+          name: manifest-src
+        - hostPath:
+            path: /etc/kubernetes/manifests
+          name: manifest-dst
+
   - path: /etc/kubernetes/manifests/kube-controller-manager.yaml
     content: |
       apiVersion: v1
@@ -212,7 +257,6 @@ write_files:
           - /hyperkube
           - controller-manager
           - --master=http://127.0.0.1:8080
-          - --leader-elect=true
           - --service-account-private-key-file=/etc/kubernetes/ssl/apiserver-key.pem
           - --root-ca-file=/etc/kubernetes/ssl/ca.pem
           - --cloud-provider=aws
@@ -239,31 +283,35 @@ write_files:
             path: /usr/share/ca-certificates
           name: ssl-certs-host
 
-  - path: /etc/kubernetes/manifests/kube-scheduler.yaml
+  - path: /etc/kubernetes/manifests/kubeturbo.yaml
     content: |
       apiVersion: v1
       kind: Pod
       metadata:
-        name: kube-scheduler
+        name: kubeturbo
         namespace: kube-system
       spec:
         hostNetwork: true
         containers:
-        - name: kube-scheduler
-          image: {{.HyperkubeImageRepo}}:{{.K8sVer}}
+        - name: kubeturbo
+          image: vmturbo/kubeturbo:0.9
           command:
-          - /hyperkube
-          - scheduler
-          - --master=http://127.0.0.1:8080
-          - --leader-elect=true
-          livenessProbe:
-            httpGet:
-              host: 127.0.0.1
-              path: /healthz
-              port: 10251
-            initialDelaySeconds: 15
-            timeoutSeconds: 1
-
+          - /bin/kubeturbo
+      args:
+        - --v=3
+        - --master=127.0.0.1:8080
+        - --etcd-servers=http://127.0.0.1:2379
+        - --config-path=/etc/kubeturbo/config
+      volumeMounts:
+      - name: vmt-config
+        mountPath: /etc/kubeturbo
+        readOnly: true
+      volumes:
+      - name: vmt-config
+        hostPath:
+          path: /etc/kubeturbo
+      restartPolicy: Always
+  
   - path: /srv/kubernetes/manifests/kube-system.json
     content: |
         {
@@ -283,23 +331,23 @@ write_files:
             "labels": {
               "k8s-app": "kube-dns",
               "kubernetes.io/cluster-service": "true",
-              "version": "v11"
+              "version": "v9"
             },
-            "name": "kube-dns-v11",
+            "name": "kube-dns-v9",
             "namespace": "kube-system"
           },
           "spec": {
             "replicas": 1,
             "selector": {
               "k8s-app": "kube-dns",
-              "version": "v11"
+              "version": "v9"
             },
             "template": {
               "metadata": {
                 "labels": {
                   "k8s-app": "kube-dns",
                   "kubernetes.io/cluster-service": "true",
-                  "version": "v11"
+                  "version": "v9"
                 }
               },
               "spec": {
@@ -316,14 +364,10 @@ write_files:
                       "-initial-cluster-token",
                       "skydns-etcd"
                     ],
-                    "image": "gcr.io/google_containers/etcd-amd64:2.2.1",
+                    "image": "gcr.io/google_containers/etcd:2.0.9",
                     "name": "etcd",
                     "resources": {
                       "limits": {
-                        "cpu": "100m",
-                        "memory": "500Mi"
-                      },
-                      "requests": {
                         "cpu": "100m",
                         "memory": "50Mi"
                       }
@@ -337,36 +381,12 @@ write_files:
                   },
                   {
                     "args": [
-                      "--domain=cluster.local"
+                      "-domain=cluster.local"
                     ],
-                    "image": "gcr.io/google_containers/kube2sky:1.14",
-                    "livenessProbe": {
-                      "failureThreshold": 5,
-                      "httpGet": {
-                        "path": "/healthz",
-                        "port": 8080,
-                        "scheme": "HTTP"
-                      },
-                      "initialDelaySeconds": 60,
-                      "successThreshold": 1,
-                      "timeoutSeconds": 5
-                    },
+                    "image": "gcr.io/google_containers/kube2sky:1.11",
                     "name": "kube2sky",
-                    "readinessProbe": {
-                      "httpGet": {
-                        "path": "/readiness",
-                        "port": 8081,
-                        "scheme": "HTTP"
-                      },
-                      "initialDelaySeconds": 30,
-                      "timeoutSeconds": 5
-                    },
                     "resources": {
                       "limits": {
-                        "cpu": "100m",
-                        "memory": "200Mi"
-                      },
-                      "requests": {
                         "cpu": "100m",
                         "memory": "50Mi"
                       }
@@ -374,12 +394,20 @@ write_files:
                   },
                   {
                     "args": [
-                      "-machines=http://127.0.0.1:4001",
+                      "-machines=http://localhost:4001",
                       "-addr=0.0.0.0:53",
-                      "-ns-rotate=false",
                       "-domain=cluster.local."
                     ],
-                    "image": "gcr.io/google_containers/skydns:2015-10-13-8c72f8c",
+                    "image": "gcr.io/google_containers/skydns:2015-03-11-001",
+                    "livenessProbe": {
+                      "httpGet": {
+                        "path": "/healthz",
+                        "port": 8080,
+                        "scheme": "HTTP"
+                      },
+                      "initialDelaySeconds": 30,
+                      "timeoutSeconds": 5
+                    },
                     "name": "skydns",
                     "ports": [
                       {
@@ -393,12 +421,17 @@ write_files:
                         "protocol": "TCP"
                       }
                     ],
+                    "readinessProbe": {
+                      "httpGet": {
+                        "path": "/healthz",
+                        "port": 8080,
+                        "scheme": "HTTP"
+                      },
+                      "initialDelaySeconds": 1,
+                      "timeoutSeconds": 5
+                    },
                     "resources": {
                       "limits": {
-                        "cpu": "100m",
-                        "memory": "200Mi"
-                      },
-                      "requests": {
                         "cpu": "100m",
                         "memory": "50Mi"
                       }
@@ -406,7 +439,7 @@ write_files:
                   },
                   {
                     "args": [
-                      "-cmd=nslookup kubernetes.default.svc.cluster.local 127.0.0.1 >/dev/null",
+                      "-cmd=nslookup kubernetes.default.svc.cluster.local localhost",
                       "-port=8080"
                     ],
                     "image": "gcr.io/google_containers/exechealthz:1.0",
@@ -419,10 +452,6 @@ write_files:
                     ],
                     "resources": {
                       "limits": {
-                        "cpu": "10m",
-                        "memory": "20Mi"
-                      },
-                      "requests": {
                         "cpu": "10m",
                         "memory": "20Mi"
                       }
@@ -475,98 +504,56 @@ write_files:
           }
         }
 
-  - path: /srv/kubernetes/manifests/heapster-dc.json
+  - path: /srv/kubernetes/manifests/heapster-rc.json
     content: |
         {
-          "apiVersion": "extensions/v1beta1",
-          "kind": "Deployment",
+          "apiVersion": "v1",
+          "kind": "ReplicationController",
           "metadata": {
+            "name": "heapster-v10",
+            "namespace": "kube-system",
             "labels": {
               "k8s-app": "heapster",
-              "kubernetes.io/cluster-service": "true",
-              "version": "v1.0.2"
-            },
-            "name": "heapster-v1.0.2",
-            "namespace": "kube-system"
+              "version": "v10",
+              "kubernetes.io/cluster-service": "true"
+            }
           },
           "spec": {
             "replicas": 1,
             "selector": {
-              "matchLabels": {
-                "k8s-app": "heapster",
-                "version": "v1.0.2"
-              }
+              "k8s-app": "heapster",
+              "version": "v10"
             },
             "template": {
               "metadata": {
                 "labels": {
                   "k8s-app": "heapster",
-                  "version": "v1.0.2"
+                  "version": "v10",
+                  "kubernetes.io/cluster-service": "true"
                 }
               },
               "spec": {
                 "containers": [
                   {
-                    "command": [
-                      "/heapster",
-                      "--source=kubernetes.summary_api:''",
-                      "--metric_resolution=60s"
-                    ],
-                    "image": "gcr.io/google_containers/heapster:v1.0.2",
+                    "image": "gcr.io/google_containers/heapster:v0.18.2",
                     "name": "heapster",
                     "resources": {
                       "limits": {
                         "cpu": "100m",
-                        "memory": "250Mi"
+                        "memory": "224Mi"
                       },
                       "requests": {
                         "cpu": "100m",
-                        "memory": "250Mi"
+                        "memory": "224Mi"
                       }
-                    }
-                  },
-                  {
+                    },
                     "command": [
-                      "/pod_nanny",
-                      "--cpu=100m",
-                      "--extra-cpu=0m",
-                      "--memory=250Mi",
-                      "--extra-memory=4Mi",
-                      "--threshold=5",
-                      "--deployment=heapster-v1.0.2",
-                      "--container=heapster",
-                      "--poll-period=300000"
-                    ],
-                    "env": [
-                      {
-                        "name": "MY_POD_NAME",
-                        "valueFrom": {
-                          "fieldRef": {
-                            "fieldPath": "metadata.name"
-                          }
-                        }
-                      },
-                      {
-                        "name": "MY_POD_NAMESPACE",
-                        "valueFrom": {
-                          "fieldRef": {
-                            "fieldPath": "metadata.namespace"
-                          }
-                        }
-                      }
-                    ],
-                    "image": "gcr.io/google_containers/addon-resizer:1.0",
-                    "name": "heapster-nanny",
-                    "resources": {
-                      "limits": {
-                        "cpu": "50m",
-                        "memory": "100Mi"
-                      },
-                      "requests": {
-                        "cpu": "50m",
-                        "memory": "100Mi"
-                      }
-                    }
+                      "/heapster",
+                      "--source=kubernetes:''",
+                      "--sink=influxdb:http://monitoring-influxdb:8086",
+                      "--stats_resolution=30s",
+                      "--sink_frequency=1m"
+                    ]
                   }
                 ]
               }
@@ -596,6 +583,110 @@ write_files:
             ],
             "selector": {
               "k8s-app": "heapster"
+            }
+          }
+        }
+
+  - path: /srv/kubernetes/manifests/influxdb-rc.json
+    content: |
+        {
+          "apiVersion": "v1",
+          "kind": "ReplicationController",
+          "metadata": {
+            "name": "monitoring-influxdb-v2",
+            "namespace": "kube-system",
+            "labels": {
+              "k8s-app": "influxdb",
+              "version": "v2",
+              "kubernetes.io/cluster-service": "true"
+            }
+          },
+          "spec": {
+            "replicas": 1,
+            "selector": {
+              "k8s-app": "influxdb",
+              "version": "v2"
+            },
+            "template": {
+              "metadata": {
+                "labels": {
+                  "k8s-app": "influxdb",
+                  "version": "v2",
+                  "kubernetes.io/cluster-service": "true"
+                }
+              },
+              "spec": {
+                "containers": [
+                  {
+                    "image": "gcr.io/google_containers/heapster_influxdb:v0.4",
+                    "name": "influxdb",
+                    "resources": {
+                      "limits": {
+                        "cpu": "100m",
+                        "memory": "200Mi"
+                      },
+                      "requests": {
+                        "cpu": "100m",
+                        "memory": "200Mi"
+                      }
+                    },
+                    "ports": [
+                      {
+                        "containerPort": 8083,
+                        "hostPort": 8083
+                      },
+                      {
+                        "containerPort": 8086,
+                        "hostPort": 8086
+                      }
+                    ],
+                    "volumeMounts": [
+                      {
+                        "name": "influxdb-persistent-storage",
+                        "mountPath": "/data"
+                      }
+                    ]
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "influxdb-persistent-storage",
+                    "emptyDir": {}
+                  }
+                ]
+              }
+            }
+          }
+        }
+
+  - path: /srv/kubernetes/manifests/influxdb-svc.json
+    content: |
+        {
+          "apiVersion": "v1",
+          "kind": "Service",
+          "metadata": {
+            "name": "monitoring-influxdb",
+            "namespace": "kube-system",
+            "labels": {
+              "kubernetes.io/cluster-service": "true",
+              "kubernetes.io/name": "InfluxDB"
+            }
+          },
+          "spec": {
+            "ports": [
+              {
+                "name": "http",
+                "port": 8083,
+                "targetPort": 8083
+              },
+              {
+                "name": "api",
+                "port": 8086,
+                "targetPort": 8086
+              }
+            ],
+            "selector": {
+              "k8s-app": "influxdb"
             }
           }
         }

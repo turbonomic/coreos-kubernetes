@@ -1,3 +1,25 @@
+# Kubernetes poweredBy VMTurbo
+
+This is going to build a Kubernetes cluster on AWS, powered by VMTurbo.
+
+Please make sure you have VMTurbo server running in your AWS account, reachable by your k8s controller.
+
+Please follow the instruction of using kube-aws, once the cluster is up and running on AWS, please create a file (/etc/kubeturbo/config) with the following contents:
+
+{
+        "serveraddress":      "{Your_VMTurbo_IP}:80",
+        "targettype":   "Kubernetes",
+        "nameoraddress":  "k8s_vmt",
+        "username":"kubernetes_user",
+        "targetidentifier": "my_k8s",
+        "password":"kubernetes_password",
+        "localaddress":"{Your master IP}",
+        "websocketusername": "vmtRemoteMediation",
+        "websocketpassword": "vmtRemoteMediation",
+        "opsmanagerusername": "{Your VMTurbo username}",
+        "opsmanagerpassword": "{Your VMTurbo password}"
+}
+
 # Kubernetes on AWS
 
 This is the source of the `kube-aws` tool and the installation artifacts used by the official Kubernetes on AWS documentation.
@@ -6,45 +28,18 @@ View the full instructions at https://coreos.com/kubernetes/docs/latest/kubernet
 
 ### Download pre-built binary
 
-Import the [CoreOS Application Signing Public Key](https://coreos.com/security/app-signing-key/):
-
-```sh
-gpg2 --keyserver pgp.mit.edu --recv-key FC8A365E
-```
-
-Validate the key fingerprint:
-
-```sh
-gpg2 --fingerprint FC8A365E
-```
-The correct key fingerprint is `18AD 5014 C99E F7E3 BA5F  6CE9 50BD D3E0 FC8A 365E`
-
-Go to the [releases](https://github.com/coreos/coreos-kubernetes/releases) and download the latest release tarball and detached signature (.sig) for your architecture.
-
-Validate the tarball's GPG signature:
-
 ```sh
 PLATFORM=linux-amd64
 # Or
 PLATFORM=darwin-amd64
 
-gpg2 --verify kube-aws-${PLATFORM}.tar.gz.sig kube-aws-${PLATFORM}.tar.gz
-```
-Extract the binary:
-
-```sh
-tar zxvf kube-aws-${PLATFORM}.tar.gz
-```
-
-Add kube-aws to your path:
-
-```sh
-mv ${PLATFORM}/kube-aws /usr/local/bin
+wget https://coreos-kubernetes.s3.amazonaws.com/kube-aws/latest/${PLATFORM}/kube-aws
+chmod +x kube-aws
+# Add kube-aws binary to your PATH
 ```
 
 ### AWS Credentials
 The supported way to provide AWS credentials to kube-aws is by exporting the following environment variables:
-
 ```sh
 export AWS_ACCESS_KEY_ID=AKID1234567890
 export AWS_SECRET_ACCESS_KEY=MY-SECRET-KEY
@@ -54,10 +49,10 @@ export AWS_SECRET_ACCESS_KEY=MY-SECRET-KEY
 
 [Amazon KMS](http://docs.aws.amazon.com/kms/latest/developerguide/overview.html) keys are used to encrypt and decrypt cluster TLS assets. If you already have a KMS Key that you would like to use, you can skip this step.
 
-Creating a KMS key can be done via the AWS web console or via the AWS cli tool:
+Creating a KMS key can be done via the AWS web console or via the AWS cli tool.
 
 ```shell
-$ aws kms --region=us-west-1 create-key --description="kube-aws assets"
+$ aws kms --region=<your-region> create-key --description="kube-aws assets"
 {
     "KeyMetadata": {
         "CreationDate": 1458235139.724,
@@ -71,7 +66,7 @@ $ aws kms --region=us-west-1 create-key --description="kube-aws assets"
     }
 }
 ```
-You'll need the `KeyMetadata.Arn` string for the next step:
+You'll need the `KeyMetadata.Arn` string for the next step.
 
 ## Initialize an asset directory
 ```sh
@@ -81,7 +76,7 @@ $ kube-aws init --cluster-name=my-cluster-name \
 --external-dns-name=my-cluster-endpoint \
 --region=us-west-1 \
 --availability-zone=us-west-1c \
---key-name=<key-pair-name> \
+--key-name=key-pair-name \
 --kms-key-arn="arn:aws:kms:us-west-1:xxxxxxxxxx:key/xxxxxxxxxxxxxxxxxxx"
 ```
 
@@ -92,7 +87,6 @@ There will now be a cluster.yaml file in the asset directory.
 ```sh
 $ kube-aws render
 ```
-
 This generates the default set of cluster assets in your asset directory. These assets are templates and credentials that are used to create, update and interact with your Kubernetes cluster.
 
 You can now customize your cluster by editing asset files:
@@ -118,23 +112,9 @@ You can now customize your cluster by editing asset files:
 
 You can also now check the `my-cluster` asset directory into version control if you desire. The contents of this directory are your reproducible cluster assets. Please take care not to commit the `my-cluster/credentials` directory, as it contains your TLS secrets. If you're using git, the `credentials` directory will already be ignored for you.
 
-## Route53 Host Record (optional)
-
-`kube-aws` can optionally create an A record for the controller IP in an existing hosted zone.
-
-Edit the `cluster.yaml` file:
-
-```yaml
-externalDNSName: my-cluster.staging.core-os.net
-createRecordSet: true
-hostedZone: staging.core-os.net
-```
-
-If `createRecordSet` is not set to true, the deployer will be responsible for making externalDNSName routable to the controller IP after the cluster is created.
-
 ## Validate your cluster assets
 
-The `validate` command check the validity of the cloud-config userdata files and the cloudformation stack description:
+The `validate` command check the validity of the cloud-config userdata files and the cloudformation stack description.
 
 ```sh
 $ kube-aws validate
@@ -157,7 +137,6 @@ $ kubectl --kubeconfig=kubeconfig get nodes
 It can take some time after `kube-aws up` completes before the cluster is available. Until then, you will have a `connection refused` error.
 
 ## Export your cloudformation stack
-
 ```sh
 $ kube-aws up --export
 ```
