@@ -1,0 +1,5 @@
+{
+    "turbo-server-address": "1.2.3.4",
+    "ops-manager-username": "foo",
+    "ops-manager-password": "bar"
+}
