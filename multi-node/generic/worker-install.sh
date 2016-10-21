@@ -13,7 +13,7 @@ export CONTROLLER_ENDPOINT=
 export K8S_VER=v0.1
 
 # Hyperkube image repository to use.
-export HYPERKUBE_IMAGE_REPO=dongyiyang/hyperkube-amd64
+export HYPERKUBE_IMAGE_REPO=vmturbo/hyperkube-amd64
 
 # The IP address of the cluster DNS service.
 # This must be the same DNS_SERVICE_IP used when configuring the controller nodes.

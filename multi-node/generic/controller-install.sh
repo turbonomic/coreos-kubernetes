@@ -4,11 +4,20 @@ set -e
 # List of etcd servers (http://ip:port), comma separated
 export ETCD_ENDPOINTS=
 
+# the IP Address for Ops Manager
+export TURBO_SERVER_ADDRESS=
+
+#Enter Username for Ops Manager
+export OPS_MANAGER_USERNAME=
+
+#Enter Password for Ops Manager
+export OPS_MANAGER_PASSWORD=
+
 # Specify the version (vX.Y.Z) of Kubernetes assets to deploy
 export K8S_VER=v0.1
 
 # Hyperkube image repository to use.
-export HYPERKUBE_IMAGE_REPO=dongyiyang/hyperkube-amd64
+export HYPERKUBE_IMAGE_REPO=vmturbo/hyperkube-amd64
 
 # The CIDR network to use for pod IPs.
 # Each pod launched in the cluster will be assigned an IP out of this range.
@@ -399,6 +408,60 @@ spec:
         port: 10251
       initialDelaySeconds: 15
       timeoutSeconds: 15
+EOF
+    fi
+
+    local TEMPLATE=/etc/kubernetes/manifests/kubeturbo.yaml
+    if [ ! -f $TEMPLATE ]; then
+        echo "TEMPLATE: $TEMPLATE"
+        mkdir -p $(dirname $TEMPLATE)
+        cat << EOF > $TEMPLATE
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubeturbo
+  namespace: kube-system
+  labels:
+    name: kubeturbo
+spec:
+  hostNetwork: true
+  containers:
+  - name: kubeturbo
+    image: vmturbo/kubeturbo:1.1
+    command:
+      - /bin/kubeturbo
+    args:
+      - --v=2
+      - --master=http://127.0.0.1:8080
+      - --etcd-servers=${ETCD_ENDPOINTS}
+      - --config-path=/etc/kubeturbo/config
+    volumeMounts:
+    - name: vmt-config
+      mountPath: /etc/kubeturbo
+      readOnly: true
+  volumes:
+  - name: vmt-config
+    hostPath:
+      path: /etc/kubeturbo
+  restartPolicy: Always
+EOF
+    fi
+
+    local TEMPLATE=/etc/kubeturbo/config
+    if [ ! -f $TEMPLATE ]; then
+        echo "TEMPLATE: $TEMPLATE"
+        mkdir -p $(dirname $TEMPLATE)
+        cat << EOF > $TEMPLATE
+{
+		"serveraddress": "$TURBO_SERVER_ADDRESS:80",
+		"targettype": "Kubernetes",
+		"nameoraddress":  "coreos-kubernetes",
+		"username":"kubernetes-user",
+		"targetidentifier": "coreos-kubernetes-cluster",
+		"localaddress":"http://127.0.0.1/",
+		"opsmanagerusername": "$OPS_MANAGER_USERNAME",
+		"opsmanagerpassword": "$OPS_MANAGER_PASSWORD"
+}
 EOF
     fi
 

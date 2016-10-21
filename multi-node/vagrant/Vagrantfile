@@ -5,6 +5,7 @@ require 'fileutils'
 require 'open-uri'
 require 'tempfile'
 require 'yaml'
+require 'json'
 
 Vagrant.require_version ">= 1.6.0"
 
@@ -28,6 +29,8 @@ end
 CONTROLLER_CLUSTER_IP="10.3.0.1"
 
 ETCD_CLOUD_CONFIG_PATH = File.expand_path("etcd-cloud-config.yaml")
+
+TURBO_SERVER_CONFIG_PATH = File.expand_path("turbo-server-config.json")
 
 CONTROLLER_CLOUD_CONFIG_PATH = File.expand_path("../generic/controller-install.sh")
 WORKER_CLOUD_CONFIG_PATH = File.expand_path("../generic/worker-install.sh")
@@ -133,9 +136,17 @@ Vagrant.configure("2") do |config|
 
   (1..$controller_count).each do |i|
     config.vm.define vm_name = "c%d" % i do |controller|
+      file = File.read(TURBO_SERVER_CONFIG_PATH)
+      data = JSON.parse(file)
+      turbo_server_address = data['serveraddress']
+      ops_manager_username = data['opsmanagerusername']
+      ops_manager_password = data['opsmanagerpassword']
 
       env_file = Tempfile.new('env_file', :binmode => true)
       env_file.write("ETCD_ENDPOINTS=#{etcd_endpoints}\n")
+      env_file.write("TURBO_SERVER_ADDRESS=#{turbo_server_address}\n")
+      env_file.write("OPS_MANAGER_USERNAME=#{ops_manager_username}\n")
+      env_file.write("OPS_MANAGER_PASSWORD=#{ops_manager_password}\n")
       env_file.close
 
       controller.vm.hostname = vm_name
