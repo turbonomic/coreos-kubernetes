@@ -21,7 +21,7 @@ offline update to upgrade your Turbonomic appliance.
    kube-aws binary can be downloaded [here](https://github.com/turbonomic/coreos-kubernetes/raw/master/multi-node/aws/kube-aws).
 
   ```sh
-  mv ${PLATFORM}/kube-aws /usr/local/bin
+  mv kube-aws /usr/local/bin
   ```
 
 ### AWS Credentials
