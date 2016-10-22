@@ -55,6 +55,9 @@ func newDefaultCluster() *Cluster {
 		CreateRecordSet:          false,
 		RecordSetTTL:             300,
 		Subnets:                  []Subnet{},
+		ServerAddress:            "1.2.3.4:80",
+		OpsmanagerUsername:       "username",
+		OpsmanagerPassword:       "password",
 	}
 }
 
@@ -145,6 +148,9 @@ type Cluster struct {
 	StackTags                map[string]string `yaml:"stackTags,omitempty"`
 	UseCalico                bool              `yaml:"useCalico,omitempty"`
 	Subnets                  []Subnet          `yaml:"subnets,omitempty"`
+	ServerAddress            string            `yaml:"serverAddress,omitempty"`
+	OpsmanagerUsername       string            `yaml:"opsmanagerUsername,omitempty"`
+	OpsmanagerPassword       string            `yaml:"opsmanagerPassword,omitempty"`
 }
 
 type Subnet struct {

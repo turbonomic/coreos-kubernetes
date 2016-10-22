@@ -42,6 +42,15 @@ availabilityZone: {{.AvailabilityZone}}
 # ARN of the KMS key used to encrypt TLS assets.
 kmsKeyArn: "{{.KMSKeyARN}}"
 
+# The IP Address of Turbonomic server
+serverAddress: "{{.ServerAddress}}"
+
+# The Username of Turbonomic server
+opsmanagerUsername: "{{.OpsmanagerUsername}}"
+
+# The Password of Turbonomic server
+opsmanagerPassword: "{{.OpsmanagerPassword}}"
+
 # Instance type for controller node
 #controllerInstanceType: m3.medium
 

@@ -31,6 +31,9 @@ func init() {
 	cmdInit.Flags().StringVar(&initOpts.AvailabilityZone, "availability-zone", "", "The AWS availability-zone to deploy to")
 	cmdInit.Flags().StringVar(&initOpts.KeyName, "key-name", "", "The AWS key-pair for ssh access to nodes")
 	cmdInit.Flags().StringVar(&initOpts.KMSKeyARN, "kms-key-arn", "", "The ARN of the AWS KMS key for encrypting TLS assets")
+	cmdInit.Flags().StringVar(&initOpts.ServerAddress, "serveraddress", "", "The Turbonomic Server IP Address")
+	cmdInit.Flags().StringVar(&initOpts.OpsmanagerUsername, "opsmanagerusername", "", "The username of turbonomic appliance")
+	cmdInit.Flags().StringVar(&initOpts.OpsmanagerPassword, "opsmanagerpassword", "", "The password of turbonomic appliance")
 }
 
 func runCmdInit(cmd *cobra.Command, args []string) error {
@@ -44,6 +47,9 @@ func runCmdInit(cmd *cobra.Command, args []string) error {
 		{"--availability-zone", initOpts.AvailabilityZone},
 		{"--key-name", initOpts.KeyName},
 		{"--kms-key-arn", initOpts.KMSKeyARN},
+		{"--serveraddress", initOpts.ServerAddress},
+		{"--opsmanagerusername", initOpts.OpsmanagerUsername},
+		{"--opsmanagerpassword", initOpts.OpsmanagerPassword},
 	}
 	var missing []string
 	for _, req := range required {

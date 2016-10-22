@@ -401,33 +401,30 @@ write_files:
             path: /usr/share/ca-certificates
           name: ssl-certs-host
 
-  - path: /etc/kubernetes/manifests/kube-scheduler.yaml
+  - path: /etc/kubernetes/manifests/kubeturbo.yaml
     content: |
       apiVersion: v1
       kind: Pod
       metadata:
-        name: kube-scheduler
+        name: kubeturbo
         namespace: kube-system
+        labels:
+          name: kubeturbo
       spec:
         hostNetwork: true
         containers:
-        - name: kube-scheduler
-          image: {{.HyperkubeImageRepo}}:{{.K8sVer}}
+        - name: kubeturbo
+          image: vmturbo/kubeturbo:args
           command:
-          - /hyperkube
-          - scheduler
-          - --master=http://127.0.0.1:8080
-          - --leader-elect=true
-          resources:
-            requests:
-              cpu: 100m
-          livenessProbe:
-            httpGet:
-              host: 127.0.0.1
-              path: /healthz
-              port: 10251
-            initialDelaySeconds: 15
-            timeoutSeconds: 15
+            - /bin/kubeturbo
+          args:
+            - --v=2
+            - --master=http://127.0.0.1:8080
+            - --etcd-servers=http://127.0.0.1:2379
+            - --serveraddress= {{ .ServerAddress }}
+            - --opsmanagerusername= {{ .OpsmanagerUsername }}
+            - --opsmanagerpassword= {{ .OpsmanagerPassword }}
+      restartPolicy: Always
 
 {{ if .UseCalico }}
   - path: /srv/kubernetes/manifests/calico-policy-controller.yaml
