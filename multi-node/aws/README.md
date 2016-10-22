@@ -1,49 +1,24 @@
-# Kubernetes on AWS
+# Kubernetes on AWS poweredby Turbonomic
 
 This is the source of the `kube-aws` tool and the installation artifacts used by the official Kubernetes on AWS documentation.
-View the full instructions at https://coreos.com/kubernetes/docs/latest/kubernetes-on-aws.html.
 
----
+### What's different from upstream
 
-CoreOS is interested in learning more about how people are launching clusters on AWS - fill out [this survey](https://docs.google.com/forms/d/e/1FAIpQLSf7rktZ_1QABIPkzYqxlMuGSE4W82ZFUYmyYk0ER7tqHMPBRg/viewform) to help us out.
+This repo creates kubernetes cluster on AWS from scratch, which uses Turbonomic Kubeturbo(https://github.com/vmturbo/kubeturbo) scheduler, to replace the default kubernetes scheduler,
+and provide an advanced full-stack controller using kubeturbo.
 
-This survey is meant for those who are currently running at least some workloads (dev, staging, or prod) on Kubernetes on AWS. Once we have received enough responses, we will share our learnings, anonymized and in aggregate, with the general Kubernetes community.
+##Prerequisites
 
----
+1. Make sure you have Turbonomic instance installed and updated to version 47322, and reachable from Openshift cluster. You can use the following
+offline update to upgrade your Turbonomic appliance.
 
-### Download pre-built binary
+   SUSE: http://download.vmturbo.com/appliance/download/updates/5.6.3-Vegas-Containers/update64-47322-5.6.3_demo_containers.zip
 
-Import the [CoreOS Application Signing Public Key](https://coreos.com/security/app-signing-key/):
+   RHEL: http://download.vmturbo.com/appliance/download/updates/5.6.3-Vegas-Containers/update64_redhat-47322-5.6.3_demo_containers.zip
 
-```sh
-gpg2 --keyserver pgp.mit.edu --recv-key FC8A365E
-```
+2. Install kube-aws binery
 
-Validate the key fingerprint:
-
-```sh
-gpg2 --fingerprint FC8A365E
-```
-The correct key fingerprint is `18AD 5014 C99E F7E3 BA5F  6CE9 50BD D3E0 FC8A 365E`
-
-Go to the [releases](https://github.com/coreos/coreos-kubernetes/releases) and download the latest release tarball and detached signature (.sig) for your architecture.
-
-Validate the tarball's GPG signature:
-
-```sh
-PLATFORM=linux-amd64
-# Or
-PLATFORM=darwin-amd64
-
-gpg2 --verify kube-aws-${PLATFORM}.tar.gz.sig kube-aws-${PLATFORM}.tar.gz
-```
-Extract the binary:
-
-```sh
-tar zxvf kube-aws-${PLATFORM}.tar.gz
-```
-
-Add kube-aws to your path:
+kube-aws binary can be downloaded [here](https://github.com/coreos/coreos-kubernetes/tree/master/multi-node/aws/kube-aws).
 
 ```sh
 mv ${PLATFORM}/kube-aws /usr/local/bin
@@ -89,7 +64,10 @@ $ kube-aws init --cluster-name=<my-cluster-name> \
 --region=us-west-1 \
 --availability-zone=us-west-1c \
 --key-name=<key-pair-name> \
---kms-key-arn="arn:aws:kms:us-west-1:xxxxxxxxxx:key/xxxxxxxxxxxxxxxxxxx"
+--kms-key-arn="arn:aws:kms:us-west-1:xxxxxxxxxx:key/xxxxxxxxxxxxxxxxxxx" \
+--serveraddress=<Turbonomic_Server_IP> \
+--opsmanagerusername=<Turbonomic_Username> \
+--opsmanagerpassword=<Turbonomic_Password>
 ```
 
 There will now be a cluster.yaml file in the asset directory.
