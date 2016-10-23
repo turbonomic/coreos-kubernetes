@@ -421,9 +421,9 @@ write_files:
             - --v=2
             - --master=http://127.0.0.1:8080
             - --etcd-servers=http://127.0.0.1:2379
-            - --serveraddress= {{.ServerAddress}}
-            - --opsmanagerusername= {{.OpsmanagerUsername}}
-            - --opsmanagerpassword= {{.OpsmanagerPassword}}
+            - --serveraddress={{.ServerAddress}}
+            - --opsmanagerusername={{.OpsmanagerUsername}}
+            - --opsmanagerpassword={{.OpsmanagerPassword}}
       restartPolicy: Always
 
 {{ if .UseCalico }}
