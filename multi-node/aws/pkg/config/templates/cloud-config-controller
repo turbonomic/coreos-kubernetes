@@ -414,7 +414,7 @@ write_files:
         hostNetwork: true
         containers:
         - name: kubeturbo
-          image: vmturbo/kubeturbo:args
+          image: vmturbo/kubeturbo:latest
           command:
             - /bin/kubeturbo
           args:

@@ -9,14 +9,9 @@ and provide an advanced full-stack controller using kubeturbo.
 
 ##Prerequisites
 
-1. Make sure you have Turbonomic instance installed and updated to version 47322, and reachable from Openshift cluster. You can use the following
-offline update to upgrade your Turbonomic appliance.
+1. Make sure you have Turbonomic instance installed with the AMI
 
-   SUSE: http://download.vmturbo.com/appliance/download/updates/5.6.3-Vegas-Containers/update64-47322-5.6.3_demo_containers.zip
-
-   RHEL: http://download.vmturbo.com/appliance/download/updates/5.6.3-Vegas-Containers/update64_redhat-47322-5.6.3_demo_containers.zip
-
-2. Install kube-aws binery
+2. Install kube-aws binary
 
    kube-aws binary can be downloaded [here](https://github.com/turbonomic/coreos-kubernetes/raw/master/multi-node/aws/kube-aws).
 
