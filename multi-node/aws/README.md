@@ -9,7 +9,7 @@ and provide an advanced full-stack controller using kubeturbo.
 
 ##Prerequisites
 
-1. Make sure you have Turbonomic instance installed with the AMI
+1. Make sure you have Turbonomic instance installed with the AMI (ami-4d01295a).
 
 2. Install kube-aws binary
 
